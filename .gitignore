@@ -1,0 +1,11 @@
+# Ignore Terraform local files
+.terraform/
+.terraform.lock.hcl
+
+# Python
+__pycache__/
+*.pyc
+
+# Editor
+.vscode/
+*.swp
