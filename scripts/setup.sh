@@ -7,6 +7,25 @@ echo "🚀 Bootstrapping Mini Cloud Platform..."
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+echo "▶ Ensuring required CLIs are installed..."
+for cmd in kubectl terraform docker; do
+	if ! command -v $cmd >/dev/null 2>&1; then
+		echo "❌ Required tool missing: $cmd"
+		exit 1
+	fi
+done
+
+# WSL / Docker Desktop kubeconfig compatibility
+echo "▶ Ensuring kubeconfig uses localhost (WSL compatibility)..."
+KCFG="$HOME/.kube/config"
+if [ -f "$KCFG" ] && grep -q "kubernetes.docker.internal" "$KCFG"; then
+	sed -i 's|kubernetes.docker.internal|127.0.0.1|g' "$KCFG"
+	echo "✔ kubeconfig patched to 127.0.0.1"
+fi
+
+# Kubectl apply wrapper to disable server-side validation during bootstrap
+KUBECTL_APPLY_CMD=(kubectl apply --validate=false -f)
+
 echo "▶ Starting LocalStack..."
 # prefer modern 'docker compose' but fall back to 'docker-compose'
 if command -v docker >/dev/null 2>&1; then
@@ -30,15 +49,15 @@ else
 fi
 
 echo "▶ Creating namespaces..."
-kubectl apply -f kubernetes/base/
+"${KUBECTL_APPLY_CMD[@]}" kubernetes/base/
 
 echo "▶ Installing Ingress controller..."
 INGRESS_FILE="kubernetes/ingress-controller/install.yaml"
 if [ -s "$INGRESS_FILE" ]; then
-    kubectl apply -f "$INGRESS_FILE"
+	"${KUBECTL_APPLY_CMD[@]}" "$INGRESS_FILE"
 else
     echo "⚠️  Local ingress manifest missing or empty — applying upstream ingress-nginx controller"
-    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
+	"${KUBECTL_APPLY_CMD[@]}" https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
 fi
 
 # Optional hardening: remind Windows users to add hosts entry so `api.local` resolves
@@ -51,23 +70,41 @@ echo "▶ Checking ingress health..."
 kubectl get ingress -n backend || true
 
 echo "▶ Deploying PostgreSQL..."
-kubectl apply -f kubernetes/database/
+"${KUBECTL_APPLY_CMD[@]}" kubernetes/database/
+
+# Wait for Postgres to be available before starting backend
+echo "▶ Waiting for PostgreSQL to be ready..."
+kubectl rollout status deployment/postgres -n data --timeout=120s || true
 
 echo "▶ Deploying backend configuration..."
-kubectl apply -f kubernetes/backend/configmap.yaml
-kubectl apply -f kubernetes/backend/secret.yaml
+"${KUBECTL_APPLY_CMD[@]}" kubernetes/backend/configmap.yaml
+"${KUBECTL_APPLY_CMD[@]}" kubernetes/backend/secret.yaml
 
 echo "▶ Deploying backend service..."
-kubectl apply -f kubernetes/backend/api-deployment.yaml
-kubectl apply -f kubernetes/backend/api-service.yaml
-kubectl apply -f kubernetes/backend/api-ingress.yaml
-kubectl apply -f kubernetes/backend/hpa.yaml
+"${KUBECTL_APPLY_CMD[@]}" kubernetes/backend/api-deployment.yaml
+"${KUBECTL_APPLY_CMD[@]}" kubernetes/backend/api-service.yaml
+"${KUBECTL_APPLY_CMD[@]}" kubernetes/backend/api-ingress.yaml
+"${KUBECTL_APPLY_CMD[@]}" kubernetes/backend/hpa.yaml
 
 echo "▶ Provisioning cloud services (S3, SQS)..."
 if [ -d "infrastructure/terraform" ]; then
 	cd infrastructure/terraform
-	terraform init -input=false
+	terraform init -input=false -upgrade
 	terraform apply -auto-approve
+
+	echo "▶ Fetching cloud outputs..."
+
+	S3_BUCKET=$(terraform output -raw s3_bucket_name)
+	SQS_URL=$(terraform output -raw sqs_queue_url)
+
+	echo "▶ Creating cloud config..."
+
+	sed -e "s|__S3_BUCKET__|$S3_BUCKET|g" \
+	    -e "s|__SQS_URL__|$SQS_URL|g" \
+	    "$REPO_ROOT/kubernetes/backend/cloud-config.yaml.template" \
+	    > "$REPO_ROOT/kubernetes/backend/cloud-config.yaml"
+
+	kubectl apply -f "$REPO_ROOT/kubernetes/backend/cloud-config.yaml"
 	cd "$REPO_ROOT"
 else
 	echo "⚠️  infrastructure/terraform not found — skipping Terraform provisioning"
@@ -75,3 +112,5 @@ fi
 
 echo "✅ Mini cloud is ready!"
 echo "API: http://api.local"
+
+

@@ -9,3 +9,11 @@ __pycache__/
 # Editor
 .vscode/
 *.swp
+ 
+# Local docs (ignore working notes)
+my-docs/
+ 
+# Ignore generated cloud config and terraform state
+kubernetes/backend/cloud-config.yaml
+infrastructure/terraform/terraform.tfstate*
+infrastructure/terraform/.terraform/
