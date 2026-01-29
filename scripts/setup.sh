@@ -86,6 +86,14 @@ echo "▶ Deploying backend service..."
 "${KUBECTL_APPLY_CMD[@]}" kubernetes/backend/api-ingress.yaml
 "${KUBECTL_APPLY_CMD[@]}" kubernetes/backend/hpa.yaml
 
+# Phase 11: build frontend image if sources exist so users don't forget
+if [ -d "frontend/web" ]; then
+	echo "▶ Building frontend Docker image..."
+	docker build -t mini-cloud-frontend:latest frontend/web
+else
+	echo "⚠️  frontend/web not found — skipping frontend image build"
+fi
+
 echo "▶ Provisioning cloud services (S3, SQS)..."
 if [ -d "infrastructure/terraform" ]; then
 	cd infrastructure/terraform

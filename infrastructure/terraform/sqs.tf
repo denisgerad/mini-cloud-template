@@ -1,3 +1,4 @@
 resource "aws_sqs_queue" "jobs" {
-  name = "job-queue"
+  name = "${var.project_name}-jobs"
 }
+

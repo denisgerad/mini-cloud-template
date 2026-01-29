@@ -22,6 +22,8 @@ spec:
         envFrom:
         - configMapRef:
             name: app-config
+        - configMapRef:
+            name: cloud-config
         - secretRef:
             name: db-secret
         livenessProbe:

@@ -1,5 +1,5 @@
 provider "aws" {
-  region = "us-east-1"
+  region = var.aws_region
 
   access_key = "test"
   secret_key = "test"
@@ -16,4 +16,5 @@ provider "aws" {
     sts = "http://localhost:4566"
   }
 }
+
 
