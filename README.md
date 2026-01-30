@@ -45,6 +45,7 @@ This mirrors real-world cloud architecture used in AWS, GCP, and Azure.
      │   │ LocalStack (AWS Simulator) │
      │   │  - S3 Bucket               │
      │   │  - SQS Queue               │
+
      Mini Cloud Platform — Phases 1 to 11
 
      A local, production-style cloud-native platform built on Docker Desktop + Kubernetes + Terraform + LocalStack, culminating in a full-stack React + API + PostgreSQL application exposed via an Ingress (load balancer).
