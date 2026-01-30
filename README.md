@@ -1,190 +1,202 @@
-# Mini Cloud Platform – Local Installation Guide
+Mini Cloud Platform — Phases 1 to 11
 
-This project bootstraps a full cloud-native environment locally using:
+A local, production-style cloud-native platform built on Docker Desktop + Kubernetes + Terraform + LocalStack, culminating in a full-stack React + API + PostgreSQL application exposed via an Ingress (load balancer).
 
-- Docker Desktop
-- Kubernetes
-- LocalStack (S3 + SQS)
-- Terraform
-- FastAPI backend
-- NGINX Ingress
+This project is designed to help developers understand how real cloud platforms work, end to end, without needing an actual AWS account.
 
-It is designed to be installed with **one command**:
+🚀 What This Project Achieves
+By completing Phases 1 → 11, you have built:
+A local Kubernetes-based cloud platform
+Infrastructure as Code using Terraform
+Simulated AWS services (S3, SQS) via LocalStack
+A backend API deployed as containers
+A PostgreSQL database running inside Kubernetes
+A React frontend served via NGINX
+Ingress-based routing similar to AWS ALB
+Fully decoupled application and infrastructure
 
-```bash
-./scripts/setup.sh
-System Requirements
-OS
-Windows 11 + WSL2 (Ubuntu)
+This mirrors real-world cloud architecture used in AWS, GCP, and Azure.
+
+🧠 High-Level Architecture
+┌───────────────────────────┐
+│        User Browser       │
+└─────────────┬─────────────┘
+              │
+      ┌───────▼────────┐
+      │ Ingress (NGINX)│   ← Load Balancer (like AWS ALB)
+      └───────┬────────┘
+              │
+     ┌────────┴──────────┐
+     │                   │
+┌────▼─────┐        ┌────▼─────┐
+│ app.local│        │ api.local│
+│ React UI │        │ API Pod  │
+│ (NGINX)  │        │ (FastAPI │
+└────┬─────┘        │  /Django)│
+     │              └────┬─────┘
+     │                   │
+     │           ┌───────▼────────┐
+     │           │ PostgreSQL DB  │
+     │           │ (K8s Stateful) │
+     │           └────────────────┘
+     │
+     │
+     │   ┌────────────────────────────┐
+     │   │ LocalStack (AWS Simulator) │
+     │   │  - S3 Bucket               │
+     │   │  - SQS Queue               │
+     │   └────────────────────────────┘
+
+📦 Project Structure
+mini-cloud/
+├── frontend/
+│   └── web/                  # React application
+│       ├── Dockerfile
+│       └── src/
+│
+├── kubernetes/
+│   ├── base/                  # Namespaces
+│   ├── ingress-controller/    # NGINX ingress
+│   ├── database/              # PostgreSQL manifests
+│   ├── backend/               # API manifests
+│   └── frontend/              # React deployment, service, ingress
+│
+├── infrastructure/
+│   └── terraform/             # S3, SQS (IaC)
+│
+├── localstack/                # Docker Compose for LocalStack
+│
+├── scripts/
+│   └── setup.sh               # One-command bootstrap
+│
+├── README.md
+└── .gitignore
+
+🧩 Phases Overview
+Phase	Description
+1	   Docker Desktop + WSL setup
+2	   Kubernetes tooling (kubectl, namespaces)
+3	   Ingress controller (NGINX)
+4	   LocalStack (AWS simulation)
+5	   Terraform provisioning (S3, SQS)
+6	   Backend API deployment
+7	   Database (PostgreSQL)
+8	   Ingress routing + DNS
+9	   Scaling, health checks, secrets
+10	   App decoupled from infrastructure
+11	   React frontend deployment
+
+🖥️    Environment Requirements
+Host System
+Windows 11
+16 GB RAM
+SSD recommended
 
 Software
-Docker Desktop (latest)
-Kubernetes enabled
+Docker Desktop (with Kubernetes enabled)
+WSL2 (Ubuntu 22.04 recommended)
+Git
+
+WSL Tools
+sudo apt update
+sudo apt install -y \
+  curl unzip git ca-certificates
+
+Install:
 kubectl
 terraform
-awscli
-git
+docker-cli
 
-One-time host setup
-1. Enable Kubernetes in Docker Desktop
-Docker Desktop → Settings → Kubernetes → Enable → Apply
-
-Wait until status shows:
-
-Kubernetes is running
-2. Windows hosts file
-Open as Administrator:
-
-C:\Windows\System32\drivers\etc\hosts
-Add:
-127.0.0.1 api.local
-Save.
-
-3. Verify kubectl works
-In WSL:
-kubectl get nodes
-
-Expected:
-docker-desktop   Ready
-Installation
-
-Step 1 – Clone
-git clone <repo-url>
+▶️ Getting Started (Quick Start)
+1. Clone the repository
+git clone <your-repo-url>
 cd mini-cloud
-
-Step 2 – Ensure no old LocalStack is running
-docker ps | grep localstack
-
-If found:
-docker stop localstack-localstack-1
-docker rm localstack-localstack-1
-
-Step 3 – Run installer
+2. Start the entire platform
 chmod +x scripts/setup.sh
 ./scripts/setup.sh
 
-Expected final output:
-Mini cloud is ready!
-API: http://api.local
+This will:
+Start LocalStack
+Create Kubernetes namespaces
+Install ingress controller
+Deploy database
+Deploy API
+Provision S3 + SQS
+Inject cloud config
+Deploy React frontend
 
-Step 4 – Test
-Open browser:
-http://api.local
-Expected JSON response.
-
-Architecture Overview
-Browser
-   |
-Ingress (NGINX)
-   |
-API Service (FastAPI, autoscaled)
-   |
-PostgreSQL
-
-+ S3 (LocalStack)
-+ SQS (LocalStack)
-+ Terraform provisioning
-
-Common Problems & Fixes
-❌ api.local shows nginx 404
-Cause:
-Missing ingressClassName
-Missing Windows hosts entry
-
-Fix:
-kubectl get ingress -n backend
-
-Ensure ingressClassName is set:
-spec:
-  ingressClassName: nginx
-
-Verify Windows hosts file contains:
+🌐 Access the Application
+Add to Windows hosts file:
 127.0.0.1 api.local
+127.0.0.1 app.local
 
-Restart ingress:
-kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
+Then open:
+Frontend: http://app.local
+API: http://api.local
+API DB test: http://api.local/db
 
-❌ kubectl cannot connect / kubernetes.docker.internal error
-Fix kubeconfig:
-nano ~/.kube/config
-
-Change:
-server: https://kubernetes.docker.internal:6443
-
-to:
-
-server: https://127.0.0.1:6443
-
-Then:
-kubectl get nodes
-
-❌ Terraform cannot download provider
-Fix DNS in WSL:
-sudo nano /etc/wsl.conf
-
-Add:
-[network]
-generateResolvConf = false
-
-Then:
-sudo rm /etc/resolv.conf
-sudo nano /etc/resolv.conf
-
-Add:
-nameserver 8.8.8.8
-nameserver 1.1.1.1
-
-Restart WSL:
-wsl --shutdown
-
-❌ Terraform: cannot connect to LocalStack
-Ensure LocalStack is running:
-docker ps | grep localstack
-
-Check health:
-curl http://localhost:4566/_localstack/health
-
-❌ Port 4566 already in use
-Another LocalStack is running:
-docker stop localstack-localstack-1
-docker rm localstack-localstack-1
-Re-run setup.
-
-Reset everything (clean reinstall)
-kubectl delete namespaces frontend backend data
-docker rm -f localstack-localstack-1
-cd infrastructure/terraform
-terraform destroy -auto-approve
-Then rerun setup.
-
-Useful commands
+🔧 Useful Commands
+Kubernetes
 kubectl get pods -A
-kubectl get ingress -A
 kubectl get svc -A
+kubectl get ingress -A
+kubectl logs -n backend deploy/api
+
+Terraform
+cd infrastructure/terraform
+terraform init
+terraform apply
+terraform output
+
+Docker
 docker ps
-Project goals
-Learn Kubernetes orchestration
-Learn cloud networking & ingress
-Learn S3 + SQS architecture
-Learn autoscaling
-Learn Terraform
-Learn platform engineering patterns
+docker images
 
-Next phases
-Frontend deployment (React)
-Worker services
-Monitoring (Prometheus/Grafana)
-CI/CD
-HTTPS
-IAM simulation
+🧯 Troubleshooting
+API not reachable from React
+Ensure CORS is enabled in API
+Check browser DevTools → Console
 
----
+Ingress 404
+Verify ingressClassName: nginx
+Ensure hosts file entries exist
 
-# Final recommendation
-For your clone test:
-1. Stop & remove LocalStack
-2. Clone project
-3. Run setup.sh
-4. Verify api.local
+kubectl OpenAPI / DNS error (WSL)
+sed -i 's/kubernetes.docker.internal/127.0.0.1/g' ~/.kube/config
 
----
+Database errors
+Verify DB credentials match
+Restart API after secret changes
+kubectl rollout restart deployment api -n backend
+
+Terraform provider errors
+terraform init -upgrade
+
+🎯 Why This Project Matters
+This project demonstrates:
+Cloud-native architecture
+Kubernetes fundamentals
+Infrastructure as Code
+App ↔ Infra decoupling
+Load balancing & routing
+Real production debugging scenarios
+
+It directly maps to AWS EKS + ALB + RDS + S3 + SQS.
+
+📌 Next Phases (Optional)
+Phase 12: CI/CD (GitHub Actions)
+Phase 13: HTTPS (cert-manager)
+Phase 14: Monitoring (Prometheus/Grafana)
+Phase 15: Background workers (SQS)
+Phase 16: Auth (JWT / OAuth)
+Phase 17: Deploy to AWS EKS
+
+✅ Status
+Mini Cloud Platform: COMPLETE (Phase 11)
+This repository can be used as:
+A learning reference
+A portfolio project
+A cloud engineering starter template
+
+Happy building ☁️🚀
+
