@@ -32,11 +32,11 @@ spec:
           image: postgres:15
           env:
             - name: POSTGRES_USER
-              value: "postgres"
+              value: "clouduser"
             - name: POSTGRES_PASSWORD
-              value: "postgres"
+              value: "cloudpass"
             - name: POSTGRES_DB
-              value: "mini_cloud"
+              value: "clouddb"
           ports:
             - containerPort: 5432
           volumeMounts:

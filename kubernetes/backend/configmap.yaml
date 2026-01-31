@@ -5,5 +5,5 @@ metadata:
   namespace: backend
 data:
   DB_HOST: postgres.data.svc.cluster.local
-  DB_NAME: clouddb
-  DB_USER: clouduser
+  DB_NAME: mini_cloud
+  DB_USER: postgres
